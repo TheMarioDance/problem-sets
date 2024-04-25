@@ -32,27 +32,47 @@ lista_datos <- list()
 
 
 for (i in archivos) {
- 
+  
   lista_datos[[i]] <- readRDS(i)
   
 }
 
-caracteristicas_generales <- rbindlist(lista_datos[grep("Caracteristicas generales", names(lista_datos))], fill = TRUE, use.names = TRUE)
 
-fuerzatrabajo <- rbindlist(lista_datos[grep("Fuerza de trabajo", names(lista_datos))], fill = TRUE, use.names = TRUE)
 
-noocup <- rbindlist(lista_datos[grep("No ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
+fuerzadetrabajo <- rbindlist(lista_datos[grep("Fuerza de trabajo", names(lista_datos))], fill = TRUE, use.names = TRUE)
 
-ocup <- rbindlist(lista_datos[grep("Ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
+noocupados <- rbindlist(lista_datos[grep("No ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
 
-resultado <- fuerzatrabajo %>%
+ocupados <- rbindlist(lista_datos[grep("Ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
+
+basedatos1 <- fuerzadetrabajo %>%
   # Agrupar datos por mes
   group_by(MES) %>%
-  # Sumar el factor de expansión para la fuerza de trabajo y la población en edad de trabajar
+  
   summarise(
-    Suma_FT = sum(factor_expansion[FT == 1], na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
-    Suma_PET = sum(factor_expansion[PET == 1], na.rm = TRUE)  # Suma de factor de expansión para la población en edad de trabajar
+    suma_FT = sum(FT, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
+    suma_PET = sum(PET, na.rm = TRUE)  # Suma de factor de expansión para la población en edad de trabajar
   )
 
-# Mostrar el resultado
-print(resultado)
+basedatos2 <- ocupados %>%
+  # Agrupar datos por mes
+  group_by(MES) %>%
+  
+  summarise(
+    suma_emp = sum(FT, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
+  )
+
+basedatos3 <- noocupados %>%
+  # Agrupar datos por mes
+  group_by(MES) %>%
+  
+  summarise(
+    suma_DSI = sum(DSI, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
+  )
+
+colapso <- basedatos1 %>%
+  left_join(basedatos2, by = "MES") %>%
+  left_join(basedatos3, by = "MES")
+
+colapso = mutate(.data = colapso , tasadesempleo = suma_DSI/suma_FT)
+colapso = mutate(.data = colapso , tasaocupacion = suma_emp/suma_PET)
