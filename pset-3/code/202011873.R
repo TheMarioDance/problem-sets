@@ -17,19 +17,22 @@ require(pacman)
 p_load(rio, # funcion import/export: permite leer/escribir archivos desde diferentes formatos. 
        skimr, # funcion skim: describe un conjunto de datos
        janitor, # contiene conjuntos de datos
-       tidyverse, ## manipular/limpiar conjuntos de datos
-       dplyr,
+       tidyverse, # manipular/limpiar conjuntos de datos
+       dplyr, #manipular dataframes
        data.table) # renombar variables
 
+#En este caso, como teniamos un problema con el directorio, lo cambiamos a "mano"
 setwd("~/GitHub/problem-sets/pset-3")
 
-# Listar todos los archivos en la carpeta 'input' y subcarpetas
+##PUNTO 1. BUCLE
+
+# Generamos un vector de nombres con los nombres de los archivos que se encuentran en input
 archivos <- list.files("input",full.names = T, recursive = T)
 
 # Crear una lista vacía para almacenar los data frames importados
 lista_datos <- list()
 
-
+#Cramos un bucle y vamos almacenando los dataframes con los nombres de la anterior lista en una lista llamada lista_datos
 
 for (i in archivos) {
   
@@ -37,42 +40,46 @@ for (i in archivos) {
   
 }
 
-
-
+#Ahora, procedemos a combinar los data frame en tres dataframe, uno para cada tipo de bases de datos que hay por mes
+#En este caso, usamos la función grep para que rbindlist agregue las bases de datos que hagan match con cada tipo de nombre
+#En primer lugar lo hacemos para los archivos de fuerza de trabajo
 fuerzadetrabajo <- rbindlist(lista_datos[grep("Fuerza de trabajo", names(lista_datos))], fill = TRUE, use.names = TRUE)
-
+#Luego para los archivos llamados No ocupados
 noocupados <- rbindlist(lista_datos[grep("No ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
-
+#Por ultimo, para los archivos de Ocupados
 ocupados <- rbindlist(lista_datos[grep("Ocupados", names(lista_datos))], fill = TRUE, use.names = TRUE)
 
+
+## PUNTO 2. Preparación
+
+#Creamos tres bases de datos diferentes, usando la base de datos de fuerzadetrabajo
+#Sumamos el numero de individuos que hacen parte de la fuerza laboral (FT==1)
+#y de los que hacen parte de la población en edad de trabajar por mes (PET==1)
+#En este caso como son variables dummy, la función sum() nos asegura encontrar la cantidad de cada uno ya que esta variable toma valor de 1 en caso de que si pertenezca a determinado grupo.
 basedatos1 <- fuerzadetrabajo %>%
-  # Agrupar datos por mes
-  group_by(MES) %>%
-  
+  group_by(MES) %>% #Agrupamos datos por mes
   summarise(
-    suma_FT = sum(FT, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
-    suma_PET = sum(PET, na.rm = TRUE)  # Suma de factor de expansión para la población en edad de trabajar
-  )
+    suma_FT = sum(FT, na.rm = TRUE),  
+    suma_PET = sum(PET, na.rm = TRUE))
 
+#Sumamos el numero de individuos que se encuentren empleados por mes (FT==1)
 basedatos2 <- ocupados %>%
-  # Agrupar datos por mes
-  group_by(MES) %>%
-  
+  group_by(MES) %>% #Agrupamos datos por mes
   summarise(
-    suma_emp = sum(FT, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
-  )
+    suma_emp = sum(FT, na.rm = TRUE))
 
+#Sumamos el numero de individuos desempleados por mes (DSI==1)
 basedatos3 <- noocupados %>%
-  # Agrupar datos por mes
-  group_by(MES) %>%
-  
+  group_by(MES) %>%# Agrupamos datos por mes
   summarise(
-    suma_DSI = sum(DSI, na.rm = TRUE),  # Suma de factor de expansión para la fuerza laboral
-  )
+    suma_DSI = sum(DSI, na.rm = TRUE))
 
-colapso <- basedatos1 %>%
+#Ahoraa unificamos las bases de datos que creamos en el punto anterior con left joins
+#En este caso tenemos el mes, la fuerza laboral, la pob en edad de trabajar, los ocupados y los desempleados de izquierda a derecha respectivamente
+output <- basedatos1 %>%
   left_join(basedatos2, by = "MES") %>%
   left_join(basedatos3, by = "MES")
 
-colapso = mutate(.data = colapso , tasadesempleo = suma_DSI/suma_FT)
-colapso = mutate(.data = colapso , tasaocupacion = suma_emp/suma_PET)
+#Por ultimo, utilizando mutate agregamos las nuevas variables deseadas para cada mes teniendo en cuenta la informacion que tenemos y las agregamos a la unica base final con mutate
+output = mutate(.data = colapso , tasadesempleo = suma_DSI/suma_FT) #Divida el numero de individuos desempleados por la fuerza laboral para obtener la tasa de desempleo
+output = mutate(.data = colapso , tasaocupacion = suma_emp/suma_PET) #Divida los ocupados por la población en edad de trabajar para obtener la tasa de ocupacion
